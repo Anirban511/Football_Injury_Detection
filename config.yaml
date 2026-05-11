@@ -1,0 +1,135 @@
+# ============================================================
+#  Football Injury Intelligence  —  config.yaml
+#  ============================================================
+#  All pipeline behaviour is controlled here.
+#  Edit freely; every key is read at runtime (no hard-coded
+#  values in the Python scripts).
+# ============================================================
+
+
+# ── Project directories ───────────────────────────────────────────────────────
+# Relative paths from the project root.  Change these to point at
+# external drives or shared network paths if needed.
+paths:
+  data_dir:    data        # raw + cleaned CSVs, prediction log
+  models_dir:  models      # saved .pkl model bundles
+  outputs_dir: outputs     # final reports (CSV + optional JSON)
+  logs_dir:    logs        # per-step .log files
+
+
+# ── Transfermarkt scraper ─────────────────────────────────────────────────────
+scraper:
+  # Polite delay between requests (seconds). Lowering this risks IP blocks.
+  delay_min: 2.5
+  delay_max: 4.5
+  request_timeout: 15        # seconds before giving up on a single request
+
+  # When true, seed data fills in players not successfully scraped.
+  # Set false only if you have full live coverage of every player.
+  always_include_seed: true
+
+  # Browser-like User-Agent sent with every HTTP request.
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+
+# ── Season / date windows ─────────────────────────────────────────────────────
+seasons:
+  # First day of the current football season — used to count
+  # "injuries this season" separately from the rolling 12-month window.
+  current_season_start: "2025-07-01"
+
+  # How many days back counts as "recent" for the 12-month injury metric.
+  lookback_days: 365
+
+
+# ── Risk score formula ────────────────────────────────────────────────────────
+# Each entry is the MAXIMUM points that factor can contribute.
+# The factors are combined into a 0-99 composite score.
+# They do NOT need to sum to 100; the score is clipped to 99.
+risk_weights:
+  injuries_last_12m:  30   # strongest single predictor
+  career_burden:      15   # raw career injury count
+  injury_severity:    12   # severe injuries (ACL, fracture, etc.)
+  workload:           18   # recent minutes-load relative to 900 min/mo
+  age:                10   # physiological decline / youth fragility
+  recurring_injury:    8   # same body part injured >= 2 times
+  recent_return:       7   # returned from injury < 30 days ago
+
+# Age breakpoints used by the age component above.
+# Players >= very_high get full age weight; younger players get a fraction.
+risk_age_thresholds:
+  very_high: 33
+  high:      30
+  moderate:  28
+  normal:    25
+  young:      0
+
+
+# ── Risk tier labels ──────────────────────────────────────────────────────────
+# Score boundaries for the four tiers shown in all reports.
+risk_tiers:
+  critical:  80   # score >= 80  -> Critical  (immediate action)
+  high:      60   # score >= 60  -> High      (reduce load)
+  moderate:  40   # score >= 40  -> Moderate  (monitor)
+  # score  < 40  -> Low          (no action)
+
+
+# ── ML model ─────────────────────────────────────────────────────────────────
+model:
+  # algorithm: gradient_boosting | random_forest
+  algorithm:          gradient_boosting
+  n_estimators:       200
+  learning_rate:      0.08
+  max_depth:          4
+  min_samples_split:  4
+  min_samples_leaf:   2
+  subsample:          0.85
+  random_state:       42
+  cv_folds:           5
+  augmentation_copies: 3
+  augmentation_noise:  0.05
+
+
+# ── Predicted injury windows ──────────────────────────────────────────────────
+# Ordered highest risk_min first. First window whose risk_min <= player score is used.
+prediction_windows:
+  - { label: "0-2 weeks",       risk_min: 85 }
+  - { label: "2-4 weeks",       risk_min: 75 }
+  - { label: "1-2 months",      risk_min: 65 }
+  - { label: "2-3 months",      risk_min: 50 }
+  - { label: "Low probability",  risk_min: 0  }
+
+
+# ── Report preferences ────────────────────────────────────────────────────────
+report:
+  top_n_risk_watch:  15
+  show_all_injured:  true
+  also_write_json:   false
+
+
+# ── Player roster ─────────────────────────────────────────────────────────────
+# Format:  "Display Name": transfermarkt_player_id
+# IDs come from the Transfermarkt URL:
+#   transfermarkt.com/erling-haaland/profil/spieler/418560
+#                                                   ^^^^^^
+players:
+  "Mohamed Salah":           148455
+  "Erling Haaland":          418560
+  "Bukayo Saka":             433177
+  "Kylian Mbappe":           342229
+  "Vinicius Jr":             371998
+  "Kevin De Bruyne":          88755
+  "Marcus Rashford":         258923
+  "Trent Alexander-Arnold":  314353
+  "Virgil van Dijk":         139758
+  "Pedri":                   722137
+  "Rodri":                   357565
+  "Lamine Yamal":           1050605
+  "Jude Bellingham":         581678
+  "Phil Foden":              406635
+  "Harry Kane":              132098
+  "Leroy Sane":              159822
+  "Reece James":             416455
+  "Ben Chilwell":            260889
+  "Mason Mount":             282559
+  "Jadon Sancho":            401173
